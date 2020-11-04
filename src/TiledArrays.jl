@@ -1,35 +1,39 @@
 module TiledArrays
 
-import Base: to_indices, to_index
+import Base: to_indices, size, getindex, setindex!
 
 export AbstractTiledArray
 
+
+"""
+    AbstractTiledArray{T, N} <: AbstractArray{T, N}
+
+Supertype for all arrays that are best indexed into in tile by tile.
+"""
 abstract type AbstractTiledArray{T, N} <: AbstractArray{T, N} end
 
-# reroute through IndexStyle
-# This allows converting indices based on IndexStyle, independent of the type tree
-to_indices(A::AbstractTiledArray, I::Tuple) = to_indices(IndexStyle(A), A, I)
+include("indexing.jl")
 
-# route to base definitions by default
-to_indices(::IndexStyle, A, I)
-to_indices(A, I::Tuple) = (@inline; to_indices(A, axes(A), I))
-to_indices(A, I::Tuple{Any}) = (@inline; to_indices(A, (eachindex(IndexLinear(), A),), I))
+"""
+    TiledArray{T, N, A<:AbstractArray{T, N}, TS<:TilingStyle}(parent::A)
 
-struct IndexTiled <: IndexStyle end
-
-IndexStyle(::Type{<:AbstractTiledArray}) = IndexTiled
-
-struct Tile{T}
-    I::T
+Wrapper around `parent` array, making it into an [`AbstractTiledArray`](@ref) with
+[`TilingStyle`](@ref) `TS`
+"""
+struct TiledArray{T, N, A<:AbstractArray{T, N}, TS<:TilingStyle} <: AbstractTiledArray{T, N}
+    parent::A
 end
 
-Tile(I::T) where {T} = Tile{T}(I)
+size(A::TiledArray) = size(A.parent)
 
-abstract type TilingStyle end
+TilingStyle(::Type{<:TiledArray{<:Any, <:Any, <:Any, TS}}) where {TS} = TS
 
-struct GridTiles{N} <: TilingStyle
-    grid::NTuple{N, Int}
-end
+# to_indices will take care of converting the Tile to the
+# correct indices for the parent's index type.
+view(A::TiledArray, t::Tile) = view(A.parent, t::Tile)
+
+getindex(A::TiledArray, t::Tile) = getindex(A.parent, t)
+
 
 include("BufferedArrays.jl")
 
